@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hector Hosting — Admin Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <div class="sidebar">
+            <div class="sidebar-brand"><span class="status-dot">🟢</span> Hector Hosting</div>
+            <nav class="sidebar-menu">
+                <a href="admin.html" class="menu-item active">🖥️ Deploy Hub</a>
+                <a href="ports.html" class="menu-item">🌐 Port Forwarding</a>
+                <a href="console.html" class="menu-item">💻 Live Console</a>
+            </nav>
+            <div class="sidebar-footer">
+                <span id="userBadge">Verifying Session...</span>
+            </div>
+        </div>
+
+        <main class="main-content">
+            <header class="content-header">
+                <h2>Infrastructure Control Dashboard</h2>
+                <span class="user-email-tag" id="userEmailDisplay">cides058@gmail.com</span>
+            </header>
+
+            <section class="card" id="ownerSection" style="display: none;">
+                <div class="card-header">
+                    <h3>👑 Super Owner Admin Management</h3>
+                    <p>Manage secondary system admin privileges dynamically.</p>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="adminEmail">Discord Account Registration Email</label>
+                        <input type="email" id="adminEmail" placeholder="target-user@gmail.com">
+                    </div>
+                </div>
+                <div class="btn-group" style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="modifyAdminRole('add')">Promote User to Admin</button>
+                    <button class="btn btn-danger" onclick="modifyAdminRole('remove')">Revoke Admin Privileges</button>
+                </div>
+            </section>
+
+            <section class="card" id="ownerIpSection" style="display: none;">
+                <div class="card-header">
+                    <h3>🌐 Add Public IPv4 to Pool (Owner Only)</h3>
+                    <p>Manually inject an unassigned static IPv4 address for custom client assignments.</p>
+                </div>
+                <div class="form-row" style="display: flex; gap: 15px; align-items: flex-end;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="newPublicIp">New Public IPv4 Address</label>
+                        <input type="text" id="newPublicIp" placeholder="e.g., 185.224.130.69">
+                    </div>
+                    <button class="btn btn-success" style="height: 45px;" onclick="addNewIpToPool()">Add IP Address</button>
+                </div>
+            </section>
+
+            <section class="card" id="addNodeSection" style="display: none;">
+                <div class="card-header">
+                    <h3>🖥️ Cluster Expansion (Add Computing Nodes)</h3>
+                    <p>Register new physical Ubuntu host machines into your local dashboard daemon.</p>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Custom Node Name</label>
+                        <input type="text" id="nodeName" placeholder="e.g., Node-US-02">
+                    </div>
+                    <div class="form-group">
+                        <label>Main Node IP Address</label>
+                        <input type="text" id="nodeIp" placeholder="xxx.xxx.xxx.xxx">
+                    </div>
+                    <div class="form-group">
+                        <label>Daemon Connect Port</label>
+                        <input type="number" id="nodePort" value="22">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addComputeNode()">Save and Sync Cluster Node</button>
+            </section>
+
+            <section class="card">
+                <div class="card-header">
+                    <h3>⚡ Instantly Deploy LXC Container</h3>
+                    <p>Provision isolated Linux containers with custom resource boundaries.</p>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Hostname / Container Name (Must be unique)</label>
+                        <input type="text" id="hostname" placeholder="e.g., mc-survival-vps">
+                    </div>
+                    <div class="form-group">
+                        <label>Dedicated Processing Limits (CPU Cores)</label>
+                        <input type="number" id="cpu" value="2" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>System Ram Allocation (GB)</label>
+                        <input type="number" id="ram" value="4" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>NVMe Disk Size (GB)</label>
+                        <input type="number" id="storage" value="20" min="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Port Forwarding Rule Limit</label>
+                        <input type="number" id="portLimit" value="5" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>IPv4 Network Assignment Pool Mode</label>
+                        <select id="networkIpMode">
+                            <option value="">Standard Shared Host Bridge NAT Mode</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="triggerContainerBuild()">Provision Live Container</button>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication state and handle UI permissions
+        fetch('/api/me')
+            .then(res => res.json())
+            .then(user => {
+                if(user.error) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                document.getElementById('userEmailDisplay').innerText = user.email;
+                document.getElementById('userBadge').innerText = `Logged in as ${user.role.toUpperCase()}`;
+                
+                if (user.role === 'owner') {
+                    document.getElementById('ownerSection').style.display = 'block';
+                    document.getElementById('ownerIpSection').style.display = 'block';
+                    document.getElementById('addNodeSection').style.display = 'block';
+                } else if (user.role === 'admin') {
+                    document.getElementById('ownerSection').style.display = 'none';
+                    document.getElementById('ownerIpSection').style.display = 'none';
+                    document.getElementById('addNodeSection').style.display = 'none';
+                }
+                loadIpPool();
+            }).catch(() => { window.location.href = 'index.html'; });
+
+        function loadIpPool() {
+            fetch('/api/ips')
+                .then(res => res.json())
+                .then(ips => {
+                    const select = document.getElementById('networkIpMode');
+                    select.innerHTML = '<option value="">Standard Shared Host Bridge NAT Mode</option>';
+                    ips.forEach(ip => {
+                        if(!ip.isAssigned) {
+                            const opt = document.createElement('option');
+                            opt.value = ip.ipAddress;
+                            opt.innerText = `${ip.ipAddress} (Available Pool IP)`;
+                            select.appendChild(opt);
+                        }
+                    });
+                });
+        }
+
+        function modifyAdminRole(action) {
+            const email = document.getElementById('adminEmail').value;
+            if(!email) return alert('Please enter a target account email.');
+            
+            fetch('/api/owner/manage-admin', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ email, action })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) alert(`Success: User access level updated.`);
+                else alert(`Error: ${data.error}`);
+            });
+        }
+
+        function addNewIpToPool() {
+            const ipAddress = document.getElementById('newPublicIp').value;
+            const ipv4Regex = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+            
+            if (!ipAddress || !ipv4Regex.test(ipAddress)) {
+                return alert('❌ Please input a valid public IPv4 address architecture string.');
+            }
+
+            fetch('/api/owner/add-ip', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ipAddress })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert('📡 IP Address injected successfully into pool database.');
+                    loadIpPool();
+                    document.getElementById('newPublicIp').value = '';
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            });
+        }
+
+        function addComputeNode() {
+            const nodeName = document.getElementById('nodeName').value;
+            const ipAddress = document.getElementById('nodeIp').value;
+            const port = document.getElementById('nodePort').value;
+
+            if(!nodeName || !ipAddress) return alert('Please fill in node deployment parameters.');
+
+            fetch('/api/owner/add-node', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ nodeName, ipAddress, port })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert(`Node "${nodeName}" synced successfully.`);
+                    document.getElementById('nodeName').value = '';
+                    document.getElementById('nodeIp').value = '';
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            });
+        }
+
+        function triggerContainerBuild() {
+            const payload = {
+                hostname: document.getElementById('hostname').value,
+                cpu: document.getElementById('cpu').value,
+                ram: document.getElementById('ram').value,
+                storage: document.getElementById('storage').value,
+                portLimit: document.getElementById('portLimit').value,
+                targetPublicIp: document.getElementById('networkIpMode').value
+            };
+
+            if(!payload.hostname) return alert('A unique container hostname identifier is required.');
+
+            alert('Initializing structural LXC build instruction pipeline. Please wait...');
+            fetch('/api/admin/create-container', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) alert(`Instance deployed successfully!\nPrivate Node Allocation: ${data.privateIp}`);
+                else alert(`Provisioning failed: ${data.error}`);
+            });
+        }
+    </script>
+</body>
+</html>
+
