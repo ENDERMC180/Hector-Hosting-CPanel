@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hector Hosting — Interactive Console</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/lib/xterm.js"></script>
+</head>
+<body>
+    <div class="dashboard-layout">
+        <div class="sidebar">
+            <div class="sidebar-brand"><span class="status-dot">🟢</span> Hector Hosting</div>
+            <nav class="sidebar-menu">
+                <a href="admin.html" class="menu-item">🖥️ Deploy Hub</a>
+                <a href="ports.html" class="menu-item">🌐 Port Forwarding</a>
+                <a href="console.html" class="menu-item active">💻 Live Console</a>
+            </nav>
+        </div>
+
+        <main class="main-content">
+            <div class="console-selector-bar">
+                <input type="text" id="targetInstanceConsole" placeholder="Enter active Container Hostname ID...">
+                <button class="btn btn-primary" onclick="connectToTerminalSocket()">Attach Terminal Session TTY</button>
+            </div>
+
+            <div class="terminal-module">
+                <div class="terminal-header">
+                    <div class="header-dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="header-title" id="terminalTitle">Console — Disconnected</div>
+                </div>
+                <div class="terminal-body-frame" id="terminal-container"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const term = new Terminal({
+            cursorBlink: true,
+            theme: { background: '#050505', foreground: '#ffffff' }
+        });
+        term.open(document.getElementById('terminal-container'));
+        term.write('Hector Control Shell Node Gateway.\r\nEnter container target parameters above to pipe interactive shell stream lines...\r\n');
+
+        function connectToTerminalSocket() {
+            const containerName = document.getElementById('targetInstanceConsole').value;
+            if(!containerName) return alert('Provide target container name.');
+
+            const ws = new WebSocket(`ws://${window.location.host}`);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ type: 'init', containerName }));
+                document.getElementById('terminalTitle').innerText = `Console — root@${containerName}`;
+                term.clear();
+                term.write(`\r\n🔗 Opening operational bidirectional network tunnel loop to: [${containerName}]...\r\n`);
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'output') term.write(msg.data);
+            };
+
+            term.onData(data => {
+                ws.send(JSON.stringify({ type: 'input', data }));
+            });
+
+            ws.onclose = () => {
+                document.getElementById('terminalTitle').innerText = "Console — Session Terminated";
+                term.write('\r\n🔌 Sockets disconnected from host process.');
+            };
+        }
+    </script>
+</body>
+</html>
+
