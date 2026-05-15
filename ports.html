@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hector Hosting — NAT Port Rules</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard-layout">
+        <div class="sidebar">
+            <div class="sidebar-brand"><span class="status-dot">🟢</span> Hector Hosting</div>
+            <nav class="sidebar-menu">
+                <a href="admin.html" class="menu-item">🖥️ Deploy Hub</a>
+                <a href="ports.html" class="menu-item active">🌐 Port Forwarding</a>
+                <a href="console.html" class="menu-item">💻 Live Console</a>
+            </nav>
+        </div>
+
+        <main class="main-content split-container">
+            <div class="panel-left">
+                <div class="card-header">
+                    <h3>🔄 Active Port Address Translation Rules</h3>
+                    <p>Dynamic mappings translating traffic between host interfaces and isolated containers (Range: 1000 - 25555).</p>
+                </div>
+                
+                <div class="rules-list" id="activeRulesWrapper">
+                    </div>
+            </div>
+
+            <div class="panel-right card">
+                <h3>➕ Add Network Forward Rule</h3>
+                <p style="font-size: 13px; color: #8a8a98; margin-bottom: 20px;">
+                    Rules allocate host string sequences between <b>1000 and 25555</b>. Ports above 25565 are completely reserved for Minecraft servers.
+                </p>
+                <div class="form-group">
+                    <label>Target Container Name Identifier</label>
+                    <input type="text" id="targetContainer" placeholder="e.g., mc-survival-vps">
+                </div>
+                <div class="form-group">
+                    <label>Target Internal Container Destination Port</label>
+                    <input type="number" id="internalPort" placeholder="e.g., 22, 80">
+                </div>
+                <div class="form-group">
+                    <label>Transport Protocol Map</label>
+                    <select id="protocolType">
+                        <option value="TCP">TCP (Transmission Control Protocol)</option>
+                        <option value="UDP">UDP (User Datagram Protocol)</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" style="width: 100%; margin-top: 10px;" onclick="createNewRuleCard()">Generate NAT Forward Line</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function loadContainerPorts() {
+            // Placeholder payload hook. Real node mapping script will load active system arrays here.
+            document.getElementById('activeRulesWrapper').innerHTML = `
+                <div class="rule-element">
+                    <div class="rule-details">
+                        <span class="network-badge tcp">TCP</span>
+                        <span class="route-map">System Interface Listening Active ──► Bounds validation flag enabled</span>
+                    </div>
+                </div>`;
+        }
+        window.onload = loadContainerPorts;
+
+        function createNewRuleCard() {
+            const payload = {
+                containerName: document.getElementById('targetContainer').value,
+                targetPort: document.getElementById('internalPort').value,
+                protocol: document.getElementById('protocolType').value
+            };
+
+            if(!payload.containerName || !payload.targetPort) return alert('Fill in all parameters fields.');
+
+            fetch('/api/containers/port-forward', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert(`Port Forwarding setup complete!\nHost Routing Endpoint: Port ${data.assignedHostPort}`);
+                    const element = document.createElement('div');
+                    element.className = 'rule-element';
+                    element.innerHTML = `
+                        <div class="rule-details">
+                            <span class="network-badge ${payload.protocol.toLowerCase()}">${payload.protocol}</span>
+                            <span class="route-map">External Host Line IP : <b>${data.assignedHostPort}</b> ──► Container Target Port : <b>${payload.targetPort}</b></span>
+                        </div>
+                    `;
+                    document.getElementById('activeRulesWrapper').appendChild(element);
+                } else {
+                    alert(`Routing error mismatch: ${data.error}`);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
